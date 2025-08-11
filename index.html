@@ -75,6 +75,19 @@ const retweetListSection = document.getElementById('retweet-list-section');
 const retweetUsersContainer = document.getElementById('retweet-users');
 const userCountSpan = document.getElementById('user-count');
 
+// Pages(프로젝트 페이지)에서도 확실히 맞는 data URL 생성
+  const DATA_URL = (() => {
+    const base = location.origin + location.pathname.replace(/index\.html?$/,'');
+    return base.replace(/\/?$/, '/') + 'data/retweeters.json?v=' + Date.now(); // 캐시 무효화
+  })();
+
+async function callAPI(path, init){
+    const url = path.startsWith('http') ? path : path; // 절대URL이면 그대로
+    const res = await fetch(url, init);
+    if(!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  }
+
 let users = []; // 서버에서 받아온 재게시 사용자 원본
 
 function show(msg, cls='text-blue-400'){ statusMessage.textContent = msg; statusMessage.className = `text-center font-medium my-2 ${cls}`; statusMessage.classList.remove('hidden'); }
@@ -181,3 +194,4 @@ drawButton.addEventListener('click', async ()=>{
 </script>
 </body>
 </html>
+
