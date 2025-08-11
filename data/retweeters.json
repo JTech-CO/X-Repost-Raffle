@@ -1,0 +1,8 @@
+{
+  "count": 3,
+  "users": [
+    {"nickname":"Alice","handle":"alice_dev","followStatus":"팔로잉","description":"builder"},
+    {"nickname":"Bob","handle":"bob_eth","followStatus":"팔로우","description":"gm"},
+    {"nickname":"Carol","handle":"carol_ai","followStatus":"팔로잉","description":"ai/infra"}
+  ]
+}
