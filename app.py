@@ -18,7 +18,7 @@ def crawl():
         return jsonify({"error":"missing url"}), 400
     start = time.time()
     try:
-        users = collect_retweeters(url, headless=True, max_scroll=60, pause=1.0)
+        users = collect_retweeters(url, headless=True, max_scroll=50, pause=1.0)
         return jsonify({"users": users, "count": len(users), "duration": round(time.time()-start,1)})
     except Exception as e:
         traceback.print_exc()
@@ -30,4 +30,5 @@ def draw():
     users = data.get("users") or []
     count = max(1, min(int(data.get("count") or 1), len(users) or 1))
     return jsonify({"winners": random.sample(users, count), "count": count})
+
 
