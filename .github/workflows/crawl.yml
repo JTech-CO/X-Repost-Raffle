@@ -1,0 +1,49 @@
+name: Crawl Retweeters
+
+on:
+  workflow_dispatch:
+    inputs:
+      tweet_url:
+        description: 'Tweet URL'
+        required: true
+      headless:
+        description: 'Headless'
+        required: false
+        default: 'true'
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Chromium
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y chromium-browser || sudo apt-get install -y chromium
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Crawl with Selenium
+        env:
+          X_USERNAME: ${{ secrets.X_USERNAME }}
+          X_PASSWORD: ${{ secrets.X_PASSWORD }}
+        run: |
+          python selenium_crawler.py \
+            --url "${{ github.event.inputs.tweet_url }}" \
+            --out data/retweeters.json \
+            --headless "${{ github.event.inputs.headless }}"
+
+      - name: Commit data
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "Update retweeters.json"
+          file_pattern: data/retweeters.json
