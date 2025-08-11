@@ -5,14 +5,7 @@ from flask_cors import CORS
 from selenium_crawler import collect_retweeters
 
 app = Flask(__name__)
-CORS(app, resources={r"/api/*": {"origins": "*"}}, supports_credentials=False)
-
-@app.after_request
-def add_headers(resp):
-    # 일부 프록시에서 프리플라이트 캐시가 안 잡히는 경우 대비
-    resp.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
-    resp.headers["Access-Control-Allow-Methods"] = "GET,POST,OPTIONS"
-    return resp
+CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 @app.get("/api/health")
 def health():
@@ -20,25 +13,14 @@ def health():
 
 @app.get("/api/crawl")
 def crawl():
-    url = request.args.get("url", "").strip()
+    url = request.args.get("url","").strip()
     if not url:
-        return jsonify({"error": "missing url"}), 400
-
-    # Render 프록시 한계(≈100s) 안에서 끝내기 위해 가드 타임아웃(80s) 권장
+        return jsonify({"error":"missing url"}), 400
     start = time.time()
     try:
-        users = collect_retweeters(
-            tweet_url=url,
-            username=os.getenv("X_USERNAME"),
-            password=os.getenv("X_PASSWORD"),
-            headless=True,
-            max_scroll=50,
-            pause=0.8,
-        )
-        dur = round(time.time() - start, 1)
-        return jsonify({"users": users, "count": len(users), "duration": dur})
+        users = collect_retweeters(url, headless=True, max_scroll=60, pause=0.7)
+        return jsonify({"users": users, "count": len(users), "duration": round(time.time()-start,1)})
     except Exception as e:
-        print("[crawl-error]", e)
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
@@ -46,7 +28,5 @@ def crawl():
 def draw():
     data = request.get_json(force=True, silent=True) or {}
     users = data.get("users") or []
-    count = int(data.get("count") or 1)
-    if not users: return jsonify({"error":"no users"}), 400
-    count = max(1, min(count, len(users)))
+    count = max(1, min(int(data.get("count") or 1), len(users) or 1))
     return jsonify({"winners": random.sample(users, count), "count": count})
