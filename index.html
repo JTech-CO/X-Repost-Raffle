@@ -148,7 +148,7 @@ form.addEventListener('submit', async (e)=>{
   }catch(err){
     // 정적모드(GitHub Actions 산출물) 폴백
     try{
-      const data = await callAPI('data/retweeters.json');
+      const data = await callAPI(DATA_URL); // 폴백 부분 수정 
       users = data.users || [];
       renderUsers(users);
       controlsSection.classList.remove('hidden');
@@ -194,4 +194,5 @@ drawButton.addEventListener('click', async ()=>{
 </script>
 </body>
 </html>
+
 
