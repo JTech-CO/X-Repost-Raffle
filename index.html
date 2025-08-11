@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1.0" />
-  <title>X 재게시 명단 분석기 (Static)</title>
+  <title>X 재게시 명단 분석기</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
@@ -63,24 +63,20 @@
     </section>
 
     <footer class="text-xs text-gray-400 pt-2">
-      • 정적 모드: 저장된 <code>data/retweeters.json</code>만 사용합니다. GitHub Actions로 주기 갱신 가능.
+      • 서버가 응답하면 실시간 크롤링을 사용하고, 실패 시 <code>data/retweeters.json</code>으로 폴백합니다.
     </footer>
   </main>
 
 <script>
-/* ========= Static-only config ========= */
+/* ===== Backend config ===== */
+const API_BASE = "https://<your-render-domain>"; // 예: https://x-raffle.onrender.com  ← 서버 URL 입력
 const DATA_URL = (() => {
-  // 프로젝트 Pages 경로를 보존하고 캐시 무효화 쿼리 추가
   const base = location.origin + location.pathname.replace(/index\.html?$/,'');
-  return base.replace(/\/?$/, '/') + 'data/retweeters.json?v=' + Date.now();
+  return base.replace(/\/?$/, '/') + 'data/retweeters.json?v=' + Date.now(); // 폴백 JSON
 })();
-async function callAPI(url, init){
-  const res = await fetch(url, init);
-  if(!res.ok) throw new Error(`HTTP ${res.status} @ ${url}`);
-  return res.json();
-}
+let BACKEND_UP = false;
 
-/* ========= DOM refs ========= */
+/* ===== DOM refs ===== */
 const form = document.getElementById('crawler-form');
 const urlInput = document.getElementById('url-input');
 const statusMessage = document.getElementById('status-message');
@@ -94,10 +90,15 @@ const sortBySelect = document.getElementById('sort-by');
 const drawButton = document.getElementById('draw-button');
 const winnerCountInput = document.getElementById('winner-count');
 
-let users = []; // 전체 명단
+let users = [];
 
-/* ========= UI helpers ========= */
-function show(msg, cls='text-orange-400'){ statusMessage.textContent = msg; statusMessage.className = `text-center text-sm ${cls}`; statusMessage.classList.remove('hidden'); }
+/* ===== Utils ===== */
+async function callAPI(url, init){
+  const res = await fetch(url, init);
+  if(!res.ok) throw new Error(`HTTP ${res.status} @ ${url}`);
+  return res.json();
+}
+function show(msg, cls='text-gray-300'){ statusMessage.textContent = msg; statusMessage.className = `text-center text-sm ${cls}`; statusMessage.classList.remove('hidden'); }
 function hideStatus(){ statusMessage.classList.add('hidden'); }
 
 function renderUsers(list){
@@ -124,7 +125,6 @@ function renderUsers(list){
   }
   userCountSpan.textContent = list.length;
 }
-
 function sortUsers(criterion){
   const list = [...users];
   if(criterion==='nickname') list.sort((a,b)=>(a.nickname||'').localeCompare(b.nickname||''));
@@ -133,60 +133,84 @@ function sortUsers(criterion){
   renderUsers(list);
 }
 
-/* ========= Events ========= */
+/* ===== Health check on load ===== */
+(async () => {
+  if(!API_BASE || API_BASE.includes('<your-render-domain')) { BACKEND_UP = false; return; }
+  try {
+    const r = await fetch(`${API_BASE}/api/health`, {mode:'cors'});
+    BACKEND_UP = r.ok;
+    console.log('health', BACKEND_UP);
+  } catch (_) { BACKEND_UP = false; }
+})();
+
+/* ===== Events ===== */
 sortBySelect.addEventListener('change', (e)=> sortUsers(e.target.value));
 
-drawButton.addEventListener('click', ()=>{
+drawButton.addEventListener('click', async ()=>{
   const n = Math.max(1, Math.min(parseInt(winnerCountInput.value||'1',10), users.length));
   if(!users.length){ alert('명단이 비어 있습니다.'); return; }
-  winnersList.innerHTML = '';
-  winnersSection.classList.remove('hidden');
+  winnersList.innerHTML=''; winnersSection.classList.remove('hidden');
 
-  const pool = [...users]; const set = new Set();
-  while(set.size < n) set.add(pool.splice(Math.floor(Math.random()*pool.length),1)[0]);
-  Array.from(set).forEach(w=>{
-    const card = document.createElement('div');
-    card.className = 'bg-green-900/70 border-2 border-green-400 rounded-xl p-4';
-    card.innerHTML = `
-      <p class="text-green-300 font-bold text-lg">${w.nickname}</p>
-      <p class="text-green-400 text-sm">@${w.handle}</p>
-      <p class="text-green-500 text-xs mt-2 truncate">${w.description||''}</p>`;
-    winnersList.appendChild(card);
-  });
+  if(BACKEND_UP){
+    try{
+      const data = await callAPI(`${API_BASE}/api/draw`, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({count:n, users})
+      });
+      (data.winners||[]).forEach(addWinnerCard);
+      return;
+    }catch(e){ console.warn('server draw fail, fallback'); }
+  }
+  // 폴백: 클라이언트 추첨
+  const pool=[...users], set=new Set(); while(set.size<n){ set.add(pool.splice(Math.floor(Math.random()*pool.length),1)[0]); }
+  Array.from(set).forEach(addWinnerCard);
+
+  function addWinnerCard(w){
+    const d=document.createElement('div');
+    d.className='bg-green-900/70 border-2 border-green-400 rounded-xl p-4';
+    d.innerHTML=`<p class="text-green-300 font-bold text-lg">${w.nickname}</p>
+                 <p class="text-green-400 text-sm">@${w.handle}</p>
+                 <p class="text-green-500 text-xs mt-2 truncate">${w.description||''}</p>`;
+    winnersList.appendChild(d);
+  }
 });
 
-/* ========= Submit: 항상 JSON만 읽음 ========= */
 form.addEventListener('submit', async (e)=>{
   e.preventDefault();
   const url = urlInput.value.trim();
   if(!url){ show('URL을 입력해주세요.','text-red-400'); return; }
 
-  show('저장된 데이터로 표시합니다.','text-gray-400');
+  if(!BACKEND_UP){
+    show('서버 연결 실패: 저장된 데이터로 표시합니다.','text-orange-400');
+    try{
+      const data = await callAPI(DATA_URL);
+      users = data.users || [];
+      renderUsers(users);
+      controlsSection.classList.remove('hidden');
+      retweetListSection.classList.remove('hidden');
+    }catch(err){
+      show('폴백 JSON을 불러오지 못했습니다.','text-red-400');
+    }
+    return;
+  }
+
+  show('크롤링 중...');
   try{
-    const data = await callAPI(DATA_URL);
+    const data = await callAPI(`${API_BASE}/api/crawl?url=${encodeURIComponent(url)}`);
     users = data.users || [];
     renderUsers(users);
     controlsSection.classList.remove('hidden');
     retweetListSection.classList.remove('hidden');
-    hideStatus(); // 메시지 숨김
+    show('크롤링 완료!','text-green-400');
   }catch(err){
-    console.error('JSON fetch failed:', err);
-    show('데이터 파일을 찾을 수 없습니다. (data/retweeters.json)','text-red-400');
+    console.error(err);
+    show('API 호출 실패: 서버 로그를 확인하세요.','text-red-400');
   }
 });
 
-/* ========= 초기 자동 로드(선택) ========= */
-/* 페이지 진입 시에도 바로 데이터 보여주고 싶다면 주석 해제
-(async ()=>{
-  try{
-    const data = await callAPI(DATA_URL);
-    users = data.users || [];
-    renderUsers(users);
-    controlsSection.classList.remove('hidden');
-    retweetListSection.classList.remove('hidden');
-  }catch(e){}
-})();
-*/
+/* ===== (선택) 초기 자동 로드 폴백 ===== */
+// (원하면 주석 해제해서 페이지 진입 시 곧바로 저장된 데이터 보여주기)
+// (async ()=>{ try{ const d=await callAPI(DATA_URL); users=d.users||[]; renderUsers(users); controlsSection.classList.remove('hidden'); retweetListSection.classList.remove('hidden'); }catch(_){} })();
 </script>
 </body>
 </html>
