@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1.0" />
-  <title>X 재게시 명단 분석기</title>
+  <title>X 재게시 명단 분석기</title> <!-- 제작자: JTech_CO -->
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
@@ -69,7 +69,7 @@
 
 <script>
 /* ===== Backend config ===== */
-const API_BASE = "https://<your-render-domain>"; // 예: https://x-raffle.onrender.com  ← 서버 URL 입력
+const API_BASE = "https://x-repost-raffle.onrender.com";
 const DATA_URL = (() => {
   const base = location.origin + location.pathname.replace(/index\.html?$/,'');
   return base.replace(/\/?$/, '/') + 'data/retweeters.json?v=' + Date.now(); // 폴백 JSON
@@ -208,9 +208,9 @@ form.addEventListener('submit', async (e)=>{
   }
 });
 
-/* ===== (선택) 초기 자동 로드 폴백 ===== */
-// (원하면 주석 해제해서 페이지 진입 시 곧바로 저장된 데이터 보여주기)
+/* ===== 초기 자동 로드 폴백 ===== */
 // (async ()=>{ try{ const d=await callAPI(DATA_URL); users=d.users||[]; renderUsers(users); controlsSection.classList.remove('hidden'); retweetListSection.classList.remove('hidden'); }catch(_){} })();
 </script>
 </body>
 </html>
+
