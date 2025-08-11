@@ -63,16 +63,16 @@
     </section>
 
     <footer class="text-xs text-gray-400 pt-2">
-      • 서버가 응답하면 실시간 크롤링을 사용하고, 실패 시 <code>data/retweeters.json</code>으로 폴백합니다.
+      • 서버 응답 시 실시간 크롤링을 사용하고, 실패 시 <code>data/retweeters.json</code>으로 폴백합니다.
     </footer>
   </main>
 
 <script>
-/* ===== Backend config ===== */
-const API_BASE = "https://x-repost-raffle.onrender.com";
+/* ===== Backend & Fallback ===== */
+const API_BASE = "https://x-repost-raffle.onrender.com"; // 서버 URL
 const DATA_URL = (() => {
   const base = location.origin + location.pathname.replace(/index\.html?$/,'');
-  return base.replace(/\/?$/, '/') + 'data/retweeters.json?v=' + Date.now(); // 폴백 JSON
+  return base.replace(/\/?$/, '/') + 'data/retweeters.json?v=' + Date.now(); // 캐시 무효화
 })();
 let BACKEND_UP = false;
 
@@ -133,15 +133,18 @@ function sortUsers(criterion){
   renderUsers(list);
 }
 
-/* ===== Health check on load ===== */
-(async () => {
-  if(!API_BASE || API_BASE.includes('<your-render-domain')) { BACKEND_UP = false; return; }
-  try {
-    const r = await fetch(`${API_BASE}/api/health`, {mode:'cors'});
-    BACKEND_UP = r.ok;
-    console.log('health', BACKEND_UP);
-  } catch (_) { BACKEND_UP = false; }
-})();
+/* ===== Warm-up health ping ===== */
+async function pingHealth(retries=5, delay=2000){
+  for(let i=0;i<retries;i++){
+    try{
+      const r = await fetch(`${API_BASE}/api/health`, {mode:'cors'});
+      if(r.ok) return true;
+    }catch(_) {}
+    await new Promise(r=>setTimeout(r, delay));
+  }
+  return false;
+}
+(async () => { BACKEND_UP = await pingHealth(1, 0); })();
 
 /* ===== Events ===== */
 sortBySelect.addEventListener('change', (e)=> sortUsers(e.target.value));
@@ -161,7 +164,7 @@ drawButton.addEventListener('click', async ()=>{
       return;
     }catch(e){ console.warn('server draw fail, fallback'); }
   }
-  // 폴백: 클라이언트 추첨
+  // 폴백 클라이언트 추첨
   const pool=[...users], set=new Set(); while(set.size<n){ set.add(pool.splice(Math.floor(Math.random()*pool.length),1)[0]); }
   Array.from(set).forEach(addWinnerCard);
 
@@ -180,8 +183,11 @@ form.addEventListener('submit', async (e)=>{
   const url = urlInput.value.trim();
   if(!url){ show('URL을 입력해주세요.','text-red-400'); return; }
 
+  show('서버 웜업 중…(최대 10초)','text-gray-400');
+  BACKEND_UP = await pingHealth(5, 2000); // 슬립 해제 재시도
   if(!BACKEND_UP){
-    show('서버 연결 실패: 저장된 데이터로 표시합니다.','text-orange-400');
+    // 폴백 시 저장 데이터 표시
+    show('서버 응답 없음: 저장된 데이터로 표시합니다.','text-orange-400');
     try{
       const data = await callAPI(DATA_URL);
       users = data.users || [];
@@ -194,23 +200,19 @@ form.addEventListener('submit', async (e)=>{
     return;
   }
 
-  show('크롤링 중...');
+  show('크롤링 중…','text-gray-300');
   try{
     const data = await callAPI(`${API_BASE}/api/crawl?url=${encodeURIComponent(url)}`);
     users = data.users || [];
     renderUsers(users);
     controlsSection.classList.remove('hidden');
     retweetListSection.classList.remove('hidden');
-    show('크롤링 완료!','text-green-400');
+    show(`크롤링 완료!${data.duration ? ` (${data.duration}s)` : ''}`,'text-green-400');
   }catch(err){
     console.error(err);
     show('API 호출 실패: 서버 로그를 확인하세요.','text-red-400');
   }
 });
-
-/* ===== 초기 자동 로드 폴백 ===== */
-// (async ()=>{ try{ const d=await callAPI(DATA_URL); users=d.users||[]; renderUsers(users); controlsSection.classList.remove('hidden'); retweetListSection.classList.remove('hidden'); }catch(_){} })();
 </script>
 </body>
 </html>
-
