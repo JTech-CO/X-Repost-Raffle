@@ -1,34 +1,34 @@
-name: Generate Retweeters JSON
+# name: Generate Retweeters JSON
 
-on:
-  workflow_dispatch: # 수동 실행
-  schedule:
-    - cron: '0 * * * *' # 매시 0분 실행 (UTC 기준)
+# on:
+#   workflow_dispatch: # 수동 실행
+#   schedule:
+#     - cron: '0 * * * *' # 매시 0분 실행 (UTC 기준)
 
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+# jobs:
+#   build:
+#     runs-on: ubuntu-latest
+#     steps:
+#       - name: Checkout repository
+#         uses: actions/checkout@v3
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
+#       - name: Set up Python
+#         uses: actions/setup-python@v4
+#         with:
+#           python-version: '3.11'
 
-      - name: Install dependencies
-        run: pip install requests
+#       - name: Install dependencies
+#         run: pip install requests
 
-      - name: Run crawler script
-        run: |
-          python selenium_crawler.py  # 여기에 실제 데이터 생성 로직
-          # 결과물은 data/retweeters.json 로 저장
+#       - name: Run crawler script
+#         run: |
+#           python selenium_crawler.py  # 여기에 실제 데이터 생성 로직
+#           # 결과물은 data/retweeters.json 로 저장
 
-      - name: Commit and push JSON
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/retweeters.json
-          git commit -m "Update retweeters.json [skip ci]" || echo "No changes"
-          git push
+#       - name: Commit and push JSON
+#         run: |
+#           git config user.name "github-actions[bot]"
+#           git config user.email "github-actions[bot]@users.noreply.github.com"
+#           git add data/retweeters.json
+#           git commit -m "Update retweeters.json [skip ci]" || echo "No changes"
+#           git push
